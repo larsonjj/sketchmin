@@ -18,10 +18,10 @@ const FILE_STAGING_DIR = `${TEMP_DIR}/staging/`;
 const cli = meow(
   `
 Usage
-  $ sketchmin <path|glob>
+  $ sketchmin <path|glob> <outputpath>
 Examples
-  $ sketchmin designs/main.sketch
-  $ sketchmin designs/*.sketch
+  $ sketchmin designs/main.sketch designs/
+  $ sketchmin designs/*.sketch designs/
 `
 );
 
@@ -105,9 +105,7 @@ function compressFolder() {
 
   output.on('close', function() {
     console.log(archive.pointer() + ' total bytes');
-    console.log(
-      'archiver has been finalized and the output file descriptor has closed.'
-    );
+    end();
   });
 
   archive.on('error', function(err) {
@@ -117,8 +115,6 @@ function compressFolder() {
   // // append files from a glob pattern
   archive.directory(FILE_STAGING_DIR, false);
   archive.finalize();
-
-  end();
 }
 
 function createDirectory(directory) {
