@@ -64,36 +64,36 @@ function extract(globFiles, outputDir) {
       .createReadStream(file)
       .pipe(unzip.Parse())
       .on('entry', function(entry) {
-	const fileName = entry.path;
-	const type = entry.type; // 'Directory' or 'File'
-	// const size = entry.size;
+        const fileName = entry.path;
+        const type = entry.type; // 'Directory' or 'File'
+        // const size = entry.size;
 
-	// Create needed directories
-	if (type === 'Directory') {
-	  return; // ignore directories
-	}
+        // Create needed directories
+        if (type === 'Directory') {
+          return; // ignore directories
+        }
 
-	// Write all files
-	if (fileName) {
-	  const tempFilePath = path.join(TEMP_DIR, fileName);
-	  fsx.ensureFileSync(tempFilePath);
-	  entry.pipe(fs.createWriteStream(tempFilePath));
-	} else {
-	  entry.autodrain();
-	}
+        // Write all files
+        if (fileName) {
+          const tempFilePath = path.join(TEMP_DIR, fileName);
+          fsx.ensureFileSync(tempFilePath);
+          entry.pipe(fs.createWriteStream(tempFilePath));
+        } else {
+          entry.autodrain();
+        }
       })
       .on('finish', () => {
-	compressImages(file, outputDir);
+        compressImages(file, outputDir);
       })
       .on('error', e => {
-	end();
-	console.error(`${ERRORS.CORRUPT_FILE}: ${file}`); // eslint-disable-line
-	// eslint-disable-next-line
-	console.error(
-	  `It is most likely not a zip compatible file or it is corrupted.`
-	);
+        end();
+        console.error(`${ERRORS.CORRUPT_FILE}: ${file}`); // eslint-disable-line
+        // eslint-disable-next-line
+        console.error(
+          `It is most likely not a zip compatible file or it is corrupted.`
+        );
 
-	throw e;
+        throw e;
       });
   });
 }
