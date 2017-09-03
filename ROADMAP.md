@@ -1,6 +1,4 @@
 # ROADMAP
 
-- Handle output path - DONE
-- Handle glob inputs - DONE
-- Handle corrupt files
-- Handle old files (<=sketch v43>)
+- Handle corrupt file errors
+- Handle old version file (<=sketch v43>) errors

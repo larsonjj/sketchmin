@@ -15,6 +15,7 @@ const fsx = require('fs-extra');
 const rimraf = require('rimraf');
 
 const TEMP_DIR = path.join(__dirname, '.tmp');
+const TEMP_IMAGES_GLOB = path.join(TEMP_DIR, '**', '*.{jpg,jpeg,png,svg}');
 
 const ERRORS = {
   PATHGLOB: 'Please specify an input file or files.',
@@ -52,14 +53,14 @@ function run(input) {
 
 function extract(globFiles, outputDir) {
   // Show loading spinner
-  spinner.start();
+  // spinner.start();
 
   // Get all input files
   const inputFiles = glob.sync(globFiles).filter(file => {
     return path.extname(file).includes('sketch');
   });
 
-  inputFiles.forEach((file, index) => {
+  inputFiles.forEach(file => {
     fs
       .createReadStream(file)
       .pipe(unzip.Parse())
@@ -77,30 +78,13 @@ function extract(globFiles, outputDir) {
 	if (fileName) {
 	  const tempFilePath = path.join(TEMP_DIR, fileName);
 	  fsx.ensureFileSync(tempFilePath);
-	  entry.pipe(
-	    fs.createWriteStream(tempFilePath).on('finish', () => {
-	      if (/.(png|jpg|jpeg|svg)/.test(tempFilePath)) {
-		const imageminPromise = compressImage(
-		  file,
-		  outputDir,
-		  tempFilePath
-		);
-		if (index === inputFiles.length - 1) {
-		  imageminPromise
-		    .then(() => {
-		      compressFolder(file, outputDir);
-		    })
-		    .catch(e => {
-		      console.error(`An error occured: ${e}`); // eslint-disable-line
-		      end();
-		    });
-		}
-	      }
-	    })
-	  );
+	  entry.pipe(fs.createWriteStream(tempFilePath));
 	} else {
 	  entry.autodrain();
 	}
+      })
+      .on('finish', () => {
+	compressImages(file, outputDir);
       })
       .on('error', () => {
 	end();
@@ -108,10 +92,28 @@ function extract(globFiles, outputDir) {
   });
 }
 
-function compressImage(file, outputDir, imagePath) {
-  const tempDir = path.dirname(imagePath);
+function compressImages(file, outputDir) {
+  // get all images
+  const imageFiles = glob.sync(TEMP_IMAGES_GLOB);
+  // Store imagemin promises
+  const imageminPromises = [];
 
-  return imagemin([imagePath], tempDir, {
+  imageFiles.forEach(imagePath => {
+    imageminPromises.push(compressImage(imagePath, path.dirname(imagePath)));
+  });
+
+  Promise.all(imageminPromises)
+    .then(() => {
+      compressFolder(file, outputDir);
+    })
+    .catch(e => {
+      console.error(`An error occured: ${e}`); // eslint-disable-line
+      end();
+    });
+}
+
+function compressImage(input, out) {
+  return imagemin([input], out, {
     plugins: [
       imageminPngquant({ quality: '65-80' }),
       imageminJpegtran(),
@@ -126,7 +128,6 @@ function end() {
 
 function compressFolder(file, outputDir) {
   const filePath = path.join(outputDir, path.basename(file));
-  console.log('hello');
   fsx.ensureFileSync(filePath);
 
   const output = fs.createWriteStream(
@@ -135,11 +136,11 @@ function compressFolder(file, outputDir) {
 
   const archive = archiver('zip');
 
-  // output.on('close', function() {
-  //   const inMb = archive.pointer() ? archive.pointer() / 1000000 : 'Unknown';
-  //   console.log('\n' + inMb + ' MB'); // eslint-disable-line
-  //   end();
-  // });
+  output.on('close', function() {
+    const inMb = archive.pointer() ? archive.pointer() / 1000000 : 'Unknown';
+    console.log('\n' + inMb + ' MB'); // eslint-disable-line
+    end();
+  });
 
   archive.on('error', function(err) {
     console.error(err); // eslint-disable-line
