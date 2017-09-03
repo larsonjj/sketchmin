@@ -13,6 +13,7 @@ const archiver = require('archiver');
 const glob = require('glob');
 const fsx = require('fs-extra');
 const rimraf = require('rimraf');
+const sharp = require('sharp');
 
 const { ERRORS } = require('./constants');
 
@@ -23,15 +24,34 @@ const cli = meow(
   `
 Usage
   $ sketchmin <path|glob> <outputpath>
+
+Options
+  -r, --resize    Provide max-width to resize all images to
+  -v, --verbose   View all output
+
 Examples
   $ sketchmin designs/main.sketch designs/
   $ sketchmin designs/*.sketch designs/
-`
+  $ sketchmin designs/**/*.sketch designs/ -r 2000
+  $ sketchmin designs/**/*.sketch designs/ -v
+`,
+  {
+    string: ['resize', 'verbose'],
+    alias: {
+      r: 'resize',
+      v: 'verbose'
+    }
+  }
 );
 
 const spinner = ora('Minifying Sketch File(s)');
 
-function run(input) {
+function run(input, opts) {
+  const _opts = Object.assign({}, opts, {
+    resize: opts.resize ? Number(opts.resize) : null,
+    verbose: Boolean(opts.hasOwnProperty('v') || opts.hasOwnProperty('verbose'))
+  });
+
   const [globFiles, outputDir] = input;
 
   if (!globFiles) {
@@ -47,10 +67,10 @@ function run(input) {
   }
 
   // Cleanup temp directory and begin extraction
-  rimraf(TEMP_DIR, () => extract(globFiles, outputDir));
+  rimraf(TEMP_DIR, () => extract(globFiles, outputDir, _opts));
 }
 
-function extract(globFiles, outputDir) {
+function extract(globFiles, outputDir, opts) {
   // Show loading spinner
   spinner.start();
 
@@ -60,6 +80,7 @@ function extract(globFiles, outputDir) {
   });
 
   if (inputFiles && inputFiles.length === 0) {
+    end();
     return console.error(ERRORS.NO_FILES); // eslint-disable-line
   }
 
@@ -87,7 +108,7 @@ function extract(globFiles, outputDir) {
         }
       })
       .on('finish', () => {
-        compressImages(file, outputDir);
+        resizeImages(file, outputDir, opts);
       })
       .on('error', e => {
         end();
@@ -102,25 +123,93 @@ function extract(globFiles, outputDir) {
   });
 }
 
-function compressImages(file, outputDir) {
+function resizeImages(file, outputDir, opts) {
+  // get all images
+  const imageFiles = glob.sync(TEMP_IMAGES_GLOB);
+  const resizeWidthText = opts.resize
+    ? ` to max-width of ${opts.resize}px`
+    : '';
+
+  spinner.clear();
+  console.log(`\nResizing images${resizeWidthText}...\n`); // eslint-disable-line
+  imageFiles.forEach((imagePath, index) => {
+    if (opts.verbose) {
+      spinner.clear();
+      console.log(`${imagePath.replace(path.dirname(imagePath) + '/', '')}`); // eslint-disable-line
+    }
+
+    const imagePromise = resizeImage(imagePath, opts.resize);
+    if (imagePromise) {
+      imagePromise
+        .then(buffer => {
+          if (buffer) {
+            fs.writeFileSync(imagePath, buffer);
+          }
+          // If last item, go to next step
+          next(index === imageFiles.length - 1);
+        })
+        .catch(e => {
+          spinner.clear();
+          console.error(`${ERRORS.CORRUPT_IMAGE}: ${imagePath}`); // eslint-disable-line
+          console.error(e); // eslint-disable-line
+          next(index === imageFiles.length - 1);
+        });
+    }
+  });
+
+  function next(ready) {
+    if (ready) {
+      return compressImages(file, outputDir, opts);
+    }
+  }
+}
+
+function resizeImage(input, resizeWidth) {
+  return sharp(input)
+    .metadata()
+    .then(info => {
+      if (resizeWidth && info.width > resizeWidth) {
+        return sharp(input)
+          .resize(resizeWidth, 9999) // Allow whatever height
+          .max()
+          .toBuffer();
+      }
+      return sharp(input).toBuffer();
+    });
+}
+
+function compressImages(file, outputDir, opts) {
   // get all images
   const imageFiles = glob.sync(TEMP_IMAGES_GLOB);
   // Store imagemin promises
   const imageminPromises = [];
 
+  spinner.clear();
+  console.log(`\nCompressing images...\n`); // eslint-disable-line
   imageFiles.forEach(imagePath => {
+    if (opts.verbose) {
+      spinner.clear();
+      console.log(`${imagePath.replace(path.dirname(imagePath) + '/', '')}`); // eslint-disable-line
+    }
+
     imageminPromises.push(compressImage(imagePath, path.dirname(imagePath)));
   });
 
   Promise.all(imageminPromises)
     .then(() => {
-      compressFolder(file, outputDir);
+      next();
     })
-    .catch(e => {
-      end();
-      console.error(ERRORS.CORRUPT_IMAGE); // eslint-disable-line
-      throw e;
+    .catch(() => {
+      spinner.clear();
+      console.error(`${ERRORS.CORRUPT_IMAGE}: ${imagePath}`); // eslint-disable-line
+      next();
     });
+
+  function next() {
+    spinner.clear();
+    console.log(`\nRebuilding...\n`); // eslint-disable-line
+    compressFolder(file, outputDir);
+  }
 }
 
 function compressImage(input, out) {
@@ -150,6 +239,7 @@ function compressFolder(file, outputDir) {
 
   output.on('close', function() {
     end();
+    console.log(`Sketchfile: ${file} complete!`); // eslint-disable-line
     const oldMb = fs.statSync(file).size / 1000000;
     const newMb = archive.pointer() ? archive.pointer() / 1000000 : 'Unknown';
     const difference = newMb !== 'Unknown' ? 100 - newMb / oldMb * 100 : '???';
@@ -159,8 +249,8 @@ function compressFolder(file, outputDir) {
   });
 
   archive.on('error', function(err) {
-    console.error(err); // eslint-disable-line
     end();
+    console.error(err); // eslint-disable-line
   });
 
   archive.pipe(output);

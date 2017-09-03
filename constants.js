@@ -4,7 +4,7 @@ const ERRORS = {
   OUTPUTPATH_EXTENSION:
     'WARNING: Output directory looks like it has en extension, which means it might not be a folder',
   CORRUPT_FILE: 'There was a problem unzipping a file',
-  CORRUPT_IMAGE: 'There was a problem compressing an image',
+  CORRUPT_IMAGE: 'There was a problem with an image',
   NO_FILES: 'No sketch files were found.'
 };
 
