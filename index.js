@@ -55,6 +55,10 @@ function extract(globFiles, outputDir) {
     return path.extname(file).includes('sketch');
   });
 
+  if (inputFiles && inputFiles.length === 0) {
+    return console.error(ERRORS.NO_FILES); // eslint-disable-line
+  }
+
   inputFiles.forEach(file => {
     fs
       .createReadStream(file)
