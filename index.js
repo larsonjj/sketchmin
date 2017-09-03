@@ -42,6 +42,10 @@ function run(input) {
     return console.error(ERRORS.OUTPUTPATH); // eslint-disable-line
   }
 
+  if (path.extname(outputDir)) {
+    return console.warn(ERRORS.OUTPUTPATH_EXTENSION); // eslint-disable-line
+  }
+
   // Cleanup temp directory and begin extraction
   rimraf(TEMP_DIR, () => extract(globFiles, outputDir));
 }
@@ -134,12 +138,13 @@ function end() {
 }
 
 function compressFolder(file, outputDir) {
-  const filePath = path.join(outputDir, path.basename(file));
-  fsx.ensureDirSync(path.dirname(filePath));
+  const baseName = path.basename(file);
+  const filePath = path.join(outputDir, baseName);
+  const dirName = path.dirname(filePath);
 
-  const output = fs.createWriteStream(
-    path.join(outputDir, path.basename(file))
-  );
+  fsx.ensureDirSync(dirName);
+
+  const output = fs.createWriteStream(filePath);
 
   const archive = archiver('zip');
 
