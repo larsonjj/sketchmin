@@ -113,8 +113,9 @@ function compressImages(file, outputDir) {
       compressFolder(file, outputDir);
     })
     .catch(e => {
-      console.error(`An error occured: ${e}`); // eslint-disable-line
       end();
+      console.error(ERRORS.CORRUPT_IMAGE); // eslint-disable-line
+      throw e;
     });
 }
 
