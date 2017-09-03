@@ -30,15 +30,18 @@
   "author": "Jake Larson <jake.j.larson@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "archiver": "^2.0.3",
+    "fs-extra": "^4.0.1",
     "get-stdin": "^5.0.1",
+    "glob": "^7.1.2",
+    "imagemin": "^5.3.1",
+    "imagemin-jpegtran": "^5.0.2",
+    "imagemin-pngquant": "^5.0.1",
+    "imagemin-svgo": "^5.2.2",
     "meow": "^3.7.0",
     "ora": "^1.3.0",
-    "imagemin": "^5.3.1",
-    "imagemin-pngquant": "^5.0.1",
-    "imagemin-jpegtran": "^5.0.2",
-    "imagemin-svgo": "^5.2.2",
-    "unzip": "^0.1.11",
-    "archiver": "^2.0.3"
+    "rimraf": "^2.6.1",
+    "unzip": "^0.1.11"
   },
   "devDependencies": {
     "ava": "^0.22.0",

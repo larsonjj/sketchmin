@@ -9,11 +9,19 @@ const imageminPngquant = require('imagemin-pngquant');
 const imageminSvgo = require('imagemin-svgo');
 const unzip = require('unzip');
 const path = require('path');
-var archiver = require('archiver');
+const archiver = require('archiver');
+const glob = require('glob');
+const fsx = require('fs-extra');
+const rimraf = require('rimraf');
 
-const TEMP_DIR = `${__dirname}/.tmp/`;
-const OUTPUT_DIR = `${TEMP_DIR}/test/`;
-const FILE_STAGING_DIR = `${TEMP_DIR}/staging/`;
+const TEMP_DIR = path.join(__dirname, '.tmp');
+
+const ERRORS = {
+  PATHGLOB: 'Please specify an input file or files.',
+  OUTPUTPATH: 'Please specify an output directory.',
+  CORRUPT_FILE: 'There was a problem unzipping a file',
+  NO_FILES: 'No sketch files were found.'
+};
 
 const cli = meow(
   `
@@ -26,107 +34,128 @@ Examples
 );
 
 const spinner = ora('Minifying Sketch File(s)');
-let sketchFilename = 'test.sketch';
-const dirsToCompress = [];
 
 function run(input) {
-  spinner.start();
+  const [globFiles, outputDir] = input;
 
-  if (!fs.existsSync(TEMP_DIR)) {
-    fs.mkdirSync(TEMP_DIR);
+  if (!globFiles) {
+    return console.error(ERRORS.PATHGLOB); // eslint-disable-line
   }
 
-  if (!fs.existsSync(FILE_STAGING_DIR)) {
-    fs.mkdirSync(FILE_STAGING_DIR);
+  if (!outputDir) {
+    return console.error(ERRORS.OUTPUTPATH); // eslint-disable-line
   }
 
-  sketchFilename = input[0];
-
-  fs
-    .createReadStream(input[0])
-    .pipe(unzip.Parse())
-    .on('entry', function(entry) {
-      const fileName = entry.path;
-      const type = entry.type; // 'Directory' or 'File'
-      // const size = entry.size;
-      const directory = path.dirname(fileName);
-
-      // Create needed directories
-      if (type === 'Directory' || directory) {
-	createDirectory(directory);
-      }
-
-      // Write all files
-      if (fileName) {
-	entry.pipe(fs.createWriteStream(`${FILE_STAGING_DIR}/${fileName}`));
-      } else {
-	entry.autodrain();
-      }
-    })
-    .on('finish', compressImage)
-    .on('error', end);
+  // Cleanup temp directory and begin extraction
+  rimraf(TEMP_DIR, () => extract(globFiles, outputDir));
 }
 
-function compressImage() {
-  if (dirsToCompress.length > 0) {
-    dirsToCompress.forEach((dir, index) => {
-      return imagemin([`${dir}/*.{png,jpeg,svg,jpg}`], dir, {
-	plugins: [
-	  imageminJpegtran(),
-	  imageminPngquant({ quality: '65-80' }),
-	  imageminSvgo()
-	]
-      }).then(files => {
-	//=> [{data: <Buffer 89 50 4e …>, path: 'build/images/foo.jpg'}, …]
-	if (index === dirsToCompress.length - 1) {
-	  compressFolder();
-	}
-      });
-    });
-  }
+function extract(globFiles, outputDir) {
+  // Show loading spinner
+  spinner.start();
 
-  end();
+  // Get all input files
+  const inputFiles = glob.sync(globFiles).filter(file => {
+    return path.extname(file).includes('sketch');
+  });
+
+  inputFiles.forEach((file, index) => {
+    fs
+      .createReadStream(file)
+      .pipe(unzip.Parse())
+      .on('entry', function(entry) {
+	const fileName = entry.path;
+	const type = entry.type; // 'Directory' or 'File'
+	// const size = entry.size;
+
+	// Create needed directories
+	if (type === 'Directory') {
+	  return; // ignore directories
+	}
+
+	// Write all files
+	if (fileName) {
+	  const tempFilePath = path.join(TEMP_DIR, fileName);
+	  fsx.ensureFileSync(tempFilePath);
+	  entry.pipe(
+	    fs.createWriteStream(tempFilePath).on('finish', () => {
+	      if (/.(png|jpg|jpeg|svg)/.test(tempFilePath)) {
+		const imageminPromise = compressImage(
+		  file,
+		  outputDir,
+		  tempFilePath
+		);
+		if (index === inputFiles.length - 1) {
+		  imageminPromise
+		    .then(() => {
+		      compressFolder(file, outputDir);
+		    })
+		    .catch(e => {
+		      console.error(`An error occured: ${e}`); // eslint-disable-line
+		      end();
+		    });
+		}
+	      }
+	    })
+	  );
+	} else {
+	  entry.autodrain();
+	}
+      })
+      .on('error', () => {
+	end();
+      });
+  });
+}
+
+function compressImage(file, outputDir, imagePath) {
+  const tempDir = path.dirname(imagePath);
+
+  return imagemin([imagePath], tempDir, {
+    plugins: [
+      imageminPngquant({ quality: '65-80' }),
+      imageminJpegtran(),
+      imageminSvgo()
+    ]
+  });
 }
 
 function end() {
-  setTimeout(() => {
-    spinner.stop();
-  }, 1000);
+  spinner.stop();
 }
 
-function compressFolder() {
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR);
-  }
+function compressFolder(file, outputDir) {
+  const filePath = path.join(outputDir, path.basename(file));
+  console.log('hello');
+  fsx.ensureFileSync(filePath);
+
   const output = fs.createWriteStream(
-    `${OUTPUT_DIR}/${path.basename(sketchFilename)}`
+    path.join(outputDir, path.basename(file))
   );
+
   const archive = archiver('zip');
 
-  output.on('close', function() {
-    console.log(archive.pointer() + ' total bytes');
+  // output.on('close', function() {
+  //   const inMb = archive.pointer() ? archive.pointer() / 1000000 : 'Unknown';
+  //   console.log('\n' + inMb + ' MB'); // eslint-disable-line
+  //   end();
+  // });
+
+  archive.on('error', function(err) {
+    console.error(err); // eslint-disable-line
     end();
   });
 
-  archive.on('error', function(err) {
-    throw err;
-  });
   archive.pipe(output);
+
   // // append files from a glob pattern
-  archive.directory(FILE_STAGING_DIR, false);
+  archive.directory(TEMP_DIR, false);
+
   archive.finalize();
 }
 
-function createDirectory(directory) {
-  const path = `${FILE_STAGING_DIR}${directory}`;
-  dirsToCompress.push(path);
-  if (!fs.existsSync(path)) {
-    fs.mkdirSync(path);
-  }
-}
-
 if (!cli.input.length && process.stdin.isTTY) {
-  console.error('Please specify at least one filename.'); // eslint-disable-line
+  console.error(ERRORS.PATHGLOB); // eslint-disable-line
   process.exit(1);
 }
 
