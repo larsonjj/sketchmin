@@ -26,17 +26,20 @@ Usage
   $ sketchmin <path|glob> <outputpath>
 
 Options
-  -r, --resize   Provide max-width to resize all images to
+  -r, --resize    Provide max-width to resize all images to
+  -v, --verbose   View all output
 
 Examples
   $ sketchmin designs/main.sketch designs/
   $ sketchmin designs/*.sketch designs/
   $ sketchmin designs/**/*.sketch designs/ -r 2000
+  $ sketchmin designs/**/*.sketch designs/ -v
 `,
   {
-    string: ['resize'],
+    string: ['resize', 'verbose'],
     alias: {
-      r: 'resize'
+      r: 'resize',
+      v: 'verbose'
     }
   }
 );
@@ -45,7 +48,8 @@ const spinner = ora('Minifying Sketch File(s)');
 
 function run(input, opts) {
   const _opts = Object.assign({}, opts, {
-    resize: opts.resize ? Number(opts.resize) : null
+    resize: opts.resize ? Number(opts.resize) : null,
+    verbose: Boolean(opts.hasOwnProperty('v') || opts.hasOwnProperty('verbose'))
   });
 
   const [globFiles, outputDir] = input;
@@ -129,8 +133,11 @@ function resizeImages(file, outputDir, opts) {
   spinner.clear();
   console.log(`\nResizing images${resizeWidthText}...\n`); // eslint-disable-line
   imageFiles.forEach((imagePath, index) => {
-    spinner.clear();
-    console.log(`${imagePath.replace(path.dirname(imagePath) + '/', '')}`); // eslint-disable-line
+    if (opts.verbose) {
+      spinner.clear();
+      console.log(`${imagePath.replace(path.dirname(imagePath) + '/', '')}`); // eslint-disable-line
+    }
+
     const imagePromise = resizeImage(imagePath, opts.resize);
     if (imagePromise) {
       imagePromise
@@ -152,7 +159,7 @@ function resizeImages(file, outputDir, opts) {
 
   function next(ready) {
     if (ready) {
-      return compressImages(file, outputDir);
+      return compressImages(file, outputDir, opts);
     }
   }
 }
@@ -171,7 +178,7 @@ function resizeImage(input, resizeWidth) {
     });
 }
 
-function compressImages(file, outputDir) {
+function compressImages(file, outputDir, opts) {
   // get all images
   const imageFiles = glob.sync(TEMP_IMAGES_GLOB);
   // Store imagemin promises
@@ -180,8 +187,11 @@ function compressImages(file, outputDir) {
   spinner.clear();
   console.log(`\nCompressing images...\n`); // eslint-disable-line
   imageFiles.forEach(imagePath => {
-    spinner.clear();
-    console.log(`${imagePath.replace(path.dirname(imagePath) + '/', '')}`); // eslint-disable-line
+    if (opts.verbose) {
+      spinner.clear();
+      console.log(`${imagePath.replace(path.dirname(imagePath) + '/', '')}`); // eslint-disable-line
+    }
+
     imageminPromises.push(compressImage(imagePath, path.dirname(imagePath)));
   });
 

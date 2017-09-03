@@ -24,11 +24,13 @@ $ sketchmin --help
 
   Options
     -r, --resize   Provide max-width to resize all images to
+    -v, --verbose   View all output
 
   Examples
     $ sketchmin designs/main.sketch designs/
     $ sketchmin designs/*.sketch designs/
     $ sketchmin designs/**/*.sketch designs/ -r 2000
+    $ sketchmin designs/**/*.sketch designs/ -v
 ```
 
 ## License
