@@ -1,6 +1,6 @@
 {
   "name": "sketchmin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Reduces sketch file size by compressing images",
   "main": "index.js",
   "bin": {
