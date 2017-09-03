@@ -76,7 +76,7 @@ function extract(globFiles, outputDir) {
         // Write all files
         if (fileName) {
           const tempFilePath = path.join(TEMP_DIR, fileName);
-          fsx.ensureFileSync(tempFilePath);
+          fsx.ensureDirSync(path.dirname(tempFilePath));
           entry.pipe(fs.createWriteStream(tempFilePath));
         } else {
           entry.autodrain();
@@ -135,7 +135,7 @@ function end() {
 
 function compressFolder(file, outputDir) {
   const filePath = path.join(outputDir, path.basename(file));
-  fsx.ensureFileSync(filePath);
+  fsx.ensureDirSync(path.dirname(filePath));
 
   const output = fs.createWriteStream(
     path.join(outputDir, path.basename(file))
@@ -160,7 +160,7 @@ function compressFolder(file, outputDir) {
 
   archive.pipe(output);
 
-  // // append files from a glob pattern
+  // append files from a glob pattern
   archive.directory(TEMP_DIR, false);
 
   archive.finalize();
