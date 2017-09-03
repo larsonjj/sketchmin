@@ -18,9 +18,8 @@
   "scripts": {
     "lint": "./node_modules/.bin/eslint *.js",
     "test": "npm run lint && npm run testonly",
-    "testonly": "./node_modules/.bin/ava test.js",
-    "precommit": "lint-staged",
-    "start": "node index.js"
+    "testonly": "./node_modules/.bin/rimraf ./tmp ./test && ./node_modules/.bin/ava test.js",
+    "precommit": "lint-staged"
   },
   "keywords": [
     "sketch",

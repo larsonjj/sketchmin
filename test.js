@@ -20,3 +20,17 @@ test('show version', async t => {
     require('./package.json').version
   );
 });
+
+test('output error on corrupt images', async t => {
+  await t.throws(execa('./index.js', ['fixtures/test_corrupt.sketch', 'test']));
+});
+
+test('successfully compress sketch file', async t => {
+  t.regex(
+    await execa.stdout('./index.js', [
+      'fixtures/test_uncompressed.sketch',
+      'test'
+    ]),
+    /Space saved/
+  );
+});

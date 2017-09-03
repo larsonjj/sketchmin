@@ -14,15 +14,10 @@ const glob = require('glob');
 const fsx = require('fs-extra');
 const rimraf = require('rimraf');
 
+const { ERRORS } = require('./constants');
+
 const TEMP_DIR = path.join(__dirname, '.tmp');
 const TEMP_IMAGES_GLOB = path.join(TEMP_DIR, '**', '*.{jpg,jpeg,png,svg}');
-
-const ERRORS = {
-  PATHGLOB: 'Please specify an input file or files.',
-  OUTPUTPATH: 'Please specify an output directory.',
-  CORRUPT_FILE: 'There was a problem unzipping a file',
-  NO_FILES: 'No sketch files were found.'
-};
 
 const cli = meow(
   `
@@ -86,8 +81,15 @@ function extract(globFiles, outputDir) {
       .on('finish', () => {
 	compressImages(file, outputDir);
       })
-      .on('error', () => {
+      .on('error', e => {
 	end();
+	console.error(`${ERRORS.CORRUPT_FILE}: ${file}`); // eslint-disable-line
+	// eslint-disable-next-line
+	console.error(
+	  `It is most likely not a zip compatible file or it is corrupted.`
+	);
+
+	throw e;
       });
   });
 }
@@ -143,7 +145,7 @@ function compressFolder(file, outputDir) {
     const difference = newMb !== 'Unknown' ? 100 - newMb / oldMb * 100 : '???';
     console.log('\nOld size: ' + oldMb + ' MB'); // eslint-disable-line
     console.log('New size: ' + newMb + ' MB'); // eslint-disable-line
-    console.log('\nSpace saved: ' + difference.toFixed(2) + ' %\n'); // eslint-disable-line
+    return console.log('\nSpace saved: ' + difference.toFixed(2) + ' %\n'); // eslint-disable-line
   });
 
   archive.on('error', function(err) {
