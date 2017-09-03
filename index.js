@@ -53,7 +53,7 @@ function run(input) {
 
 function extract(globFiles, outputDir) {
   // Show loading spinner
-  // spinner.start();
+  spinner.start();
 
   // Get all input files
   const inputFiles = glob.sync(globFiles).filter(file => {
@@ -137,9 +137,13 @@ function compressFolder(file, outputDir) {
   const archive = archiver('zip');
 
   output.on('close', function() {
-    const inMb = archive.pointer() ? archive.pointer() / 1000000 : 'Unknown';
-    console.log('\n' + inMb + ' MB'); // eslint-disable-line
     end();
+    const oldMb = fs.statSync(file).size / 1000000;
+    const newMb = archive.pointer() ? archive.pointer() / 1000000 : 'Unknown';
+    const difference = newMb !== 'Unknown' ? 100 - newMb / oldMb * 100 : '???';
+    console.log('\nOld size: ' + oldMb + ' MB'); // eslint-disable-line
+    console.log('New size: ' + newMb + ' MB'); // eslint-disable-line
+    console.log('\nSpace saved: ' + difference.toFixed(2) + ' %\n'); // eslint-disable-line
   });
 
   archive.on('error', function(err) {
