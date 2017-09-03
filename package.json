@@ -1,6 +1,6 @@
 {
   "name": "sketchmin",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Reduces sketch file size by compressing images",
   "main": "index.js",
   "bin": {
@@ -16,10 +16,13 @@
     "index.js"
   ],
   "scripts": {
+    "clean": "./node_modules/.bin/rimraf ./tmp ./test",
     "lint": "./node_modules/.bin/eslint *.js",
     "test": "npm run lint && npm run testonly",
-    "testonly": "./node_modules/.bin/rimraf ./tmp ./test && ./node_modules/.bin/ava test.js",
-    "precommit": "lint-staged"
+    "testonly": "npm run clean && ./node_modules/.bin/ava test.js",
+    "precommit": "lint-staged",
+    "preversion": "npm run clean && npm test",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "sketch",
